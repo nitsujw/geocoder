@@ -133,7 +133,7 @@ module Geocoder::Store
           conditions << obj.id
         end
         {
-          :group => attributes.map{ |c| "#{table_name}.#{c}" }.join(','),
+          :group => properties.map{ |c| "#{table_name}.#{c.name}" }.join(','),
           :order => options[:order],
           :limit => options[:limit],
           :offset => options[:offset],
