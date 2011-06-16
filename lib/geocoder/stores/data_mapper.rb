@@ -8,25 +8,21 @@ module Geocoder::Store
       base.extend ClassMethods
       base.class_eval do
 
-        def geocoded
-          all(geocoder_options[:coordinates].ne => nil)
+        def self.geocoded
+          all(:conditions => "#{geocoder_options[:latitude]} IS NOT NULL AND #{geocoder_options[:longitude]} IS NOT NULL")
         end
 
-        def not_geocoded
-          all(geocoder_options[:coordinates] => nil)
+        def self.not_geocoded
+          all(:conditions => "#{geocoder_options[:latitude]} IS NULL AND #{geocoder_options[:longitude]} IS NULL")
         end
 
-        def near(location, *args)
+        def self.near(location, *args)
           latitude, longitude = Geocoder::Calculations.extract_coordinates(location)
           if latitude and longitude
             near_scope_options(latitude, longitude, *args)
           else
             {}
           end
-        end
-
-        def self.hellothere
-          'hi'
         end
 
       end
