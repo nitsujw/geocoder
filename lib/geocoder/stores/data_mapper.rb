@@ -129,11 +129,11 @@ module Geocoder::Store
           ["#{lat_attr} BETWEEN ? AND ? AND #{lon_attr} BETWEEN ? AND ?"] +
           [b[0], b[2], b[1], b[3]]
         if obj = options[:exclude]
-          conditions[0] << " AND #{table_name}.id != ?"
+          conditions[0] << " AND #{self.name.to_s.downcase}.id != ?"
           conditions << obj.id
         end
         {
-          :group => properties.map{ |c| "#{table_name}.#{c.name}" }.join(','),
+          :group => properties.map{ |c| "#{e.model.to_s.downcase}.#{c.name}" }.join(','),
           :order => options[:order],
           :limit => options[:limit],
           :offset => options[:offset],
