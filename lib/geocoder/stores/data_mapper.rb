@@ -5,6 +5,7 @@ module Geocoder::Store
     include Base
 
     def self.included(base)
+      base.extend ClassMethods
       base.class_eval do
 
         def geocoded
@@ -22,6 +23,10 @@ module Geocoder::Store
           else
             {}
           end
+        end
+
+        def self.hellothere
+          'hi'
         end
 
       end
