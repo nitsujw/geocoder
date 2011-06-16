@@ -9,11 +9,11 @@ module Geocoder::Store
       base.class_eval do
 
         def self.geocoded
-          all(:conditions => "#{geocoder_options[:latitude]} IS NOT NULL AND #{geocoder_options[:longitude]} IS NOT NULL")
+          all("#{geocoder_options[:latitude]}".to_sym.not => nil, "#{geocoder_options[:longitude]}".to_sym.not => nil)
         end
 
         def self.not_geocoded
-          all(:conditions => "#{geocoder_options[:latitude]} IS NULL AND #{geocoder_options[:longitude]} IS NULL")
+          all("#{geocoder_options[:latitude]}".to_sym => nil, "#{geocoder_options[:longitude]}".to_sym => nil)
         end
 
         def self.near(location, *args)
