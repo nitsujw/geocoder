@@ -44,7 +44,7 @@ module Geocoder::Store
 
       def near_scope_options(latitude, longitude, radius = 20, options = {})
         radius *= Geocoder::Calculations.km_in_mi if options[:units] == :km
-        if connection.adapter_name.match /sqlite/i
+        if repository(:default).adapter.options["adapter"].match /sqlite/i
           approx_near_scope_options(latitude, longitude, radius, options)
         else
           full_near_scope_options(latitude, longitude, radius, options)
