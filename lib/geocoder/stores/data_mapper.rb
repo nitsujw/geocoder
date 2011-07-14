@@ -82,12 +82,13 @@ module Geocoder::Store
           "COS(#{latitude} * PI() / 180) * COS(#{lat_attr} * PI() / 180) * " +
           "POWER(SIN((#{longitude} - #{lon_attr}) * PI() / 180 / 2), 2) ))"
         options[:order] ||= "#{distance} ASC"
-        default_near_scope_options(latitude, longitude, radius, options).merge(
+        sql_hash = default_near_scope_options(latitude, longitude, radius, options).merge(
           :select => "#{options[:select] || '*'}, " +
             "#{distance} AS distance" +
             (bearing ? ", #{bearing} AS bearing" : ""),
           :having => "#{distance} <= #{radius}"
         )
+        construct_datamapper_sql(sql_hash)
       end
 
       def approx_near_scope_options(latitude, longitude, radius, options)
@@ -113,21 +114,37 @@ module Geocoder::Store
 
         distance = "(#{dy} * ABS(#{lat_attr} - #{latitude}) * #{factor}) + " +
           "(#{dx} * ABS(#{lon_attr} - #{longitude}) * #{factor})"
-        default_near_scope_options(latitude, longitude, radius, options).merge(
+        sql_hash = default_near_scope_options(latitude, longitude, radius, options).merge(
           :select => "#{options[:select] || '*'}, " +
             "#{distance} AS distance" +
             (bearing ? ", #{bearing} AS bearing" : ""),
           :order => distance
         )
+        construct_datamapper_sql(sql_hash)
+        
       end
-
+      
+      def construct_datamapper_sql(options)
+        sql = "SELECT #{options[:select]} "
+        sql << "FROM #{self.storage_name} "
+        sql << "WHERE (#{options[:conditions]}) "
+        sql << "ORDER BY #{options[:order]} "
+        convert_to_original_class(sql)
+      end
+      
+      def convert_to_original_class(sql)
+        structs = repository(:default).adapter.select sql
+        ids = structs.inject([]) do |array,struct|
+          array << struct.id
+        end
+        self.all(:id => ids)
+      end
       def default_near_scope_options(latitude, longitude, radius, options)
         lat_attr = geocoder_options[:latitude]
         lon_attr = geocoder_options[:longitude]
         b = Geocoder::Calculations.bounding_box([latitude, longitude], radius, options)
         conditions = \
-          ["#{lat_attr} BETWEEN ? AND ? AND #{lon_attr} BETWEEN ? AND ?"] +
-          [b[0], b[2], b[1], b[3]]
+          ["#{lat_attr} BETWEEN #{b[0]} AND #{b[2]} AND #{lon_attr} BETWEEN #{b[1]} AND #{b[3]}"]
         if obj = options[:exclude]
           conditions[0] << " AND #{self.name.to_s.downcase}.id != ?"
           conditions << obj.id
