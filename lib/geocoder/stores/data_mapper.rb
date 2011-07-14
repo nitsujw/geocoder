@@ -137,7 +137,7 @@ module Geocoder::Store
         ids = structs.inject([]) do |array,struct|
           array << struct.id
         end
-        if self.class = Class
+        if self.class == Class
           return self.all(:id => ids)
         else
           return eval("#{self.class}.all(:id=>#{ids})")
