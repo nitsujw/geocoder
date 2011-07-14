@@ -59,33 +59,33 @@ module Geocoder::Store
         when :linear
           "CAST(" +
             "DEGREES(ATAN2( " +
-              "RADIANS(#{lon_attr} - #{longitude}), " +
-              "RADIANS(#{lat_attr} - #{latitude})" +
+            "RADIANS(#{lon_attr} - #{longitude}), " +
+            "RADIANS(#{lat_attr} - #{latitude})" +
             ")) + 360 " +
-          "AS decimal) % 360"
+            "AS decimal) % 360"
         when :spherical
           "CAST(" +
             "DEGREES(ATAN2( " +
-              "SIN(RADIANS(#{lon_attr} - #{longitude})) * " +
-              "COS(RADIANS(#{lat_attr})), (" +
-                "COS(RADIANS(#{latitude})) * SIN(RADIANS(#{lat_attr}))" +
-              ") - (" +
-                "SIN(RADIANS(#{latitude})) * COS(RADIANS(#{lat_attr})) * " +
-                "COS(RADIANS(#{lon_attr} - #{longitude}))" +
-              ")" +
+            "SIN(RADIANS(#{lon_attr} - #{longitude})) * " +
+            "COS(RADIANS(#{lat_attr})), (" +
+            "COS(RADIANS(#{latitude})) * SIN(RADIANS(#{lat_attr}))" +
+            ") - (" +
+            "SIN(RADIANS(#{latitude})) * COS(RADIANS(#{lat_attr})) * " +
+            "COS(RADIANS(#{lon_attr} - #{longitude}))" +
+            ")" +
             ")) + 360 " +
-          "AS decimal) % 360"
+            "AS decimal) % 360"
         end
         earth = Geocoder::Calculations.earth_radius(options[:units] || :mi)
         distance = "#{earth} * 2 * ASIN(SQRT(" +
           "POWER(SIN((#{latitude} - #{lat_attr}) * PI() / 180 / 2), 2) + " +
           "COS(#{latitude} * PI() / 180) * COS(#{lat_attr} * PI() / 180) * " +
           "POWER(SIN((#{longitude} - #{lon_attr}) * PI() / 180 / 2), 2) ))"
-        options[:order] ||= "#{distance} ASC"
+          options[:order] ||= "#{distance} ASC"
         sql_hash = default_near_scope_options(latitude, longitude, radius, options).merge(
           :select => "#{options[:select] || '*'}, " +
-            "#{distance} AS distance" +
-            (bearing ? ", #{bearing} AS bearing" : ""),
+          "#{distance} AS distance" +
+          (bearing ? ", #{bearing} AS bearing" : ""),
           :having => "#{distance} <= #{radius}"
         )
         construct_datamapper_sql(sql_hash)
@@ -101,7 +101,7 @@ module Geocoder::Store
             "WHEN (#{lat_attr} < #{latitude} AND #{lon_attr} >= #{longitude}) THEN 135.0 " +
             "WHEN (#{lat_attr} < #{latitude} AND #{lon_attr} < #{longitude}) THEN 225.0 " +
             "WHEN (#{lat_attr} >= #{latitude} AND #{lon_attr} < #{longitude}) THEN 315.0 " +
-          "END"
+            "END"
         else
           bearing = false
         end
@@ -116,14 +116,14 @@ module Geocoder::Store
           "(#{dx} * ABS(#{lon_attr} - #{longitude}) * #{factor})"
         sql_hash = default_near_scope_options(latitude, longitude, radius, options).merge(
           :select => "#{options[:select] || '*'}, " +
-            "#{distance} AS distance" +
-            (bearing ? ", #{bearing} AS bearing" : ""),
+          "#{distance} AS distance" +
+          (bearing ? ", #{bearing} AS bearing" : ""),
           :order => distance
         )
         construct_datamapper_sql(sql_hash)
-        
+
       end
-      
+
       def construct_datamapper_sql(options)
         sql = "SELECT #{options[:select]} "
         sql << "FROM #{self.storage_name} "
@@ -131,13 +131,17 @@ module Geocoder::Store
         sql << "ORDER BY #{options[:order]} "
         convert_to_original_class(sql)
       end
-      
+
       def convert_to_original_class(sql)
         structs = repository(:default).adapter.select sql
         ids = structs.inject([]) do |array,struct|
           array << struct.id
         end
-        self.all(:id => ids)
+        if self.class = Class
+          return self.all(:id => ids)
+        else
+          return eval("#{self.class}.all(:id=>#{ids})")
+        end
       end
       def default_near_scope_options(latitude, longitude, radius, options)
         lat_attr = geocoder_options[:latitude]
