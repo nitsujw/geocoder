@@ -127,7 +127,7 @@ module Geocoder::Store
       def construct_datamapper_sql(options)
         sql = "SELECT #{options[:select]} "
         sql << "FROM #{self.storage_name} "
-        sql << "WHERE (#{options[:conditions]}) "
+        sql << "WHERE (#{options[:conditions].first}) "
         sql << "ORDER BY #{options[:order]} "
         convert_to_original_class(sql)
       end
