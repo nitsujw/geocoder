@@ -1,36 +1,13 @@
 require 'geocoder/models/base'
+require 'geocoder/models/mongo_base'
 
 module Geocoder
   module Model
     module Mongoid
       include Base
+      include MongoBase
 
       def self.included(base); base.extend(self); end
-
-      ##
-      # Set attribute names and include the Geocoder module.
-      #
-      def geocoded_by(address_attr, options = {}, &block)
-        geocoder_init(
-          :geocode       => true,
-          :user_address  => address_attr,
-          :coordinates   => options[:coordinates] || :coordinates,
-          :geocode_block => block
-        )
-      end
-
-      ##
-      # Set attribute names and include the Geocoder module.
-      #
-      def reverse_geocoded_by(coordinates_attr, options = {}, &block)
-        geocoder_init(
-          :reverse_geocode => true,
-          :fetched_address => options[:address] || :address,
-          :coordinates     => coordinates_attr,
-          :reverse_block   => block
-        )
-      end
-
 
       private # --------------------------------------------------------------
 
@@ -39,8 +16,16 @@ module Geocoder
 
       def geocoder_init(options)
         super(options)
-        index [[ geocoder_options[:coordinates], Mongo::GEO2D ]],
-          :min => -180, :max => 180 # create 2d index
+        if options[:skip_index] == false
+          # create 2d index
+          if defined?(::Mongoid::VERSION) && ::Mongoid::VERSION >= "3"
+            index({ geocoder_options[:coordinates].to_sym => '2d' }, 
+                  {:min => -180, :max => 180})
+          else
+            index [[ geocoder_options[:coordinates], '2d' ]],
+              :min => -180, :max => 180
+          end
+        end
       end
     end
   end

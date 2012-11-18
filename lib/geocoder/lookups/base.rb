@@ -1,4 +1,5 @@
 require 'net/http'
+require 'net/https'
 require 'uri'
 
 unless defined?(ActiveSupport::JSON)
@@ -12,6 +13,7 @@ end
 
 module Geocoder
   module Lookup
+
     class Base
 
       ##
@@ -22,18 +24,13 @@ module Geocoder
       # "205.128.54.202") for geocoding, or coordinates (latitude, longitude)
       # for reverse geocoding. Returns an array of <tt>Geocoder::Result</tt>s.
       #
-      def search(query)
-
-        # if coordinates given as string, turn into array
-        query = query.split(/\s*,\s*/) if coordinates?(query)
-
-        if query.is_a?(Array)
-          reverse = true
-          query = query.join(',')
-        else
-          reverse = false
-        end
-        results(query, reverse).map{ |r| result_class.new(r) }
+      def search(query, options = {})
+        query = Geocoder::Query.new(query, options) unless query.is_a?(Geocoder::Query)
+        results(query).map{ |r|
+          result = result_class.new(r)
+          result.cache_hit = @cache_hit if cache
+          result
+        }
       end
 
       ##
@@ -72,44 +69,67 @@ module Geocoder
       ##
       # Geocoder::Result object or nil on timeout or other error.
       #
-      def results(query, reverse = false)
+      def results(query)
         fail
+      end
+
+      def query_url_params(query)
+        query.options[:params] || {}
+      end
+
+      def url_query_string(query)
+        hash_to_query(
+          query_url_params(query).reject{ |key,value| value.nil? }
+        )
       end
 
       ##
       # URL to use for querying the geocoding engine.
       #
-      def query_url(query, reverse = false)
+      def query_url(query)
         fail
+      end
+
+      ##
+      # Key to use for caching a geocoding result. Usually this will be the
+      # request URL, but in cases where OAuth is used and the nonce,
+      # timestamp, etc varies from one request to another, we need to use
+      # something else (like the URL before OAuth encoding).
+      #
+      def cache_key(query)
+        query_url(query)
       end
 
       ##
       # Class of the result objects
       #
       def result_class
-        eval("Geocoder::Result::#{self.class.to_s.split(":").last}")
+        Geocoder::Result.const_get(self.class.to_s.split(":").last)
       end
 
       ##
-      # Raise exception instead of warning for specified exceptions.
+      # Raise exception if configuration specifies it should be raised.
+      # Return false if exception not raised.
       #
-      def raise_error(err)
-        raise err if Geocoder::Configuration.always_raise.include?(err.class)
+      def raise_error(error, message = nil)
+        exceptions = Geocoder::Configuration.always_raise
+        if exceptions == :all or exceptions.include?( error.is_a?(Class) ? error : error.class )
+          raise error, message
+        else
+          false
+        end
       end
-
 
       ##
       # Returns a parsed search result (Ruby hash).
       #
-      def fetch_data(query, reverse = false)
-        begin
-          parse_raw_data fetch_raw_data(query, reverse)
-        rescue SocketError => err
-          raise_error(err) or warn "Geocoding API connection cannot be established."
-        rescue TimeoutError => err
-          raise_error(err) or warn "Geocoding API not responding fast enough " +
-            "(see Geocoder::Configuration.timeout to set limit)."
-        end
+      def fetch_data(query)
+        parse_raw_data fetch_raw_data(query)
+      rescue SocketError => err
+        raise_error(err) or warn "Geocoding API connection cannot be established."
+      rescue TimeoutError => err
+        raise_error(err) or warn "Geocoding API not responding fast enough " +
+          "(see Geocoder::Configuration.timeout to set limit)."
       end
 
       ##
@@ -119,12 +139,10 @@ module Geocoder
         if defined?(ActiveSupport::JSON)
           ActiveSupport::JSON.decode(raw_data)
         else
-          begin
-            JSON.parse(raw_data)
-          rescue
-            warn "Geocoding API's response was not valid JSON."
-          end
+          JSON.parse(raw_data)
         end
+      rescue
+        warn "Geocoding API's response was not valid JSON."
       end
 
       ##
@@ -136,18 +154,34 @@ module Geocoder
       end
 
       ##
-      # Fetches a raw search result (JSON string).
+      # Fetch a raw geocoding result (JSON string).
+      # The result might or might not be cached.
       #
-      def fetch_raw_data(query, reverse = false)
-        timeout(Geocoder::Configuration.timeout) do
-          url = query_url(query, reverse)
-          unless cache and response = cache[url]
-            response = http_client.get_response(URI.parse(url)).body
-            if cache
-              cache[url] = response
-            end
+      def fetch_raw_data(query)
+        key = cache_key(query)
+        if cache and body = cache[key]
+          @cache_hit = true
+        else
+          response = make_api_request(query)
+          body = response.body
+          if cache and (200..399).include?(response.code.to_i)
+            cache[key] = body
           end
-          response
+          @cache_hit = false
+        end
+        body
+      end
+
+      ##
+      # Make an HTTP(S) request to a geocoding API and
+      # return the response object.
+      #
+      def make_api_request(query)
+        timeout(Geocoder::Configuration.timeout) do
+          uri = URI.parse(query_url(query))
+          client = http_client.new(uri.host, uri.port)
+          client.use_ssl = true if Geocoder::Configuration.use_https
+          client.get(uri.request_uri, Geocoder::Configuration.http_headers)
         end
       end
 
@@ -156,20 +190,6 @@ module Geocoder
       #
       def cache
         Geocoder.cache
-      end
-
-      ##
-      # Is the given string a loopback IP address?
-      #
-      def loopback_address?(ip)
-        !!(ip == "0.0.0.0" or ip.to_s.match(/^127/))
-      end
-
-      ##
-      # Does the given string look like latitude/longitude coordinates?
-      #
-      def coordinates?(value)
-        value.is_a?(String) and !!value.to_s.match(/^-?[0-9\.]+, *-?[0-9\.]+$/)
       end
 
       ##

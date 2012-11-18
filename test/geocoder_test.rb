@@ -3,10 +3,6 @@ require 'test_helper'
 
 class GeocoderTest < Test::Unit::TestCase
 
-  def setup
-    Geocoder::Configuration.set_defaults
-  end
-
   def test_distance_to_returns_float
     v = Venue.new(*venue_params(:msg))
     v.latitude, v.longitude = [40.750354, -73.993371]
@@ -34,6 +30,12 @@ class GeocoderTest < Test::Unit::TestCase
     coords = [40.750354, -73.993371]
     assert_equal coords, v.geocode
     assert_equal coords, [v.latitude, v.longitude]
+  end
+
+  def test_geocode_block_executed_when_no_results
+    v = Event.new("Nowhere", "no results")
+    v.geocode
+    assert_equal "NOT FOUND", v.coords_string
   end
 
   def test_reverse_geocode_assigns_and_returns_address

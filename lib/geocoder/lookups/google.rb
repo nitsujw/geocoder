@@ -10,28 +10,43 @@ module Geocoder::Lookup
 
     private # ---------------------------------------------------------------
 
-    def results(query, reverse = false)
-      return [] unless doc = fetch_data(query, reverse)
+    def results(query)
+      return [] unless doc = fetch_data(query)
       case doc['status']; when "OK" # OK status implies >0 results
         return doc['results']
       when "OVER_QUERY_LIMIT"
-        warn "Google Geocoding API error: over query limit."
+        raise_error(Geocoder::OverQueryLimitError) ||
+          warn("Google Geocoding API error: over query limit.")
       when "REQUEST_DENIED"
-        warn "Google Geocoding API error: request denied."
+        raise_error(Geocoder::RequestDenied) ||
+          warn("Google Geocoding API error: request denied.")
       when "INVALID_REQUEST"
-        warn "Google Geocoding API error: invalid request."
+        raise_error(Geocoder::InvalidRequest) ||
+          warn("Google Geocoding API error: invalid request.")
       end
       return []
     end
 
-    def query_url(query, reverse = false)
+    def query_url_google_params(query)
       params = {
-        (reverse ? :latlng : :address) => query,
+        (query.reverse_geocode? ? :latlng : :address) => query.sanitized_text,
         :sensor => "false",
-        :language => Geocoder::Configuration.language,
-        :key => Geocoder::Configuration.api_key
+        :language => Geocoder::Configuration.language
       }
-      "#{protocol}://maps.google.com/maps/api/geocode/json?" + hash_to_query(params)
+      unless (bounds = query.options[:bounds]).nil?
+        params[:bounds] = bounds.map{ |point| "%f,%f" % point }.join('|')
+      end
+      params
+    end
+
+    def query_url_params(query)
+      super.merge(query_url_google_params(query)).merge(
+        :key => Geocoder::Configuration.api_key
+      )
+    end
+
+    def query_url(query)
+      "#{protocol}://maps.googleapis.com/maps/api/geocode/json?" + url_query_string(query)
     end
   end
 end

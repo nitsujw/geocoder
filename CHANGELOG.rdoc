@@ -2,6 +2,95 @@
 
 Per-release changes to Geocoder.
 
+== 1.1.5 (2012 Nov 9)
+
+* Replace support for old Yahoo Placefinder with Yahoo BOSS (thanks github.com/pwoltman).
+* Add support for actual Mapquest API (was previously just a proxy for Nominatim), including the paid service (thanks github.com/jedschneider).
+* Add support for :select => :id_only option to near scope.
+* Treat a given query as blank (don't do a lookup) if coordinates are given but latitude or longitude is nil.
+* Speed up 'near' queries by adding bounding box condition (thanks github.com/mlandauer).
+* Fix: don't redefine Object#hash in Yahoo result object (thanks github.com/m0thman).
+
+== 1.1.4 (2012 Oct 2)
+
+* Deprecate Geocoder::Result::Nominatim#class and #type methods. Use #place_class and #place_type instead.
+* Add support for setting arbitrary parameters in geocoding request URL.
+* Add support for Google's :bounds parameter (thanks to github.com/rosscooperman and github.com/peterjm for submitting suggestions).
+* Add support for :select => :geo_only option to near scope (thanks github.com/gugl).
+* Add ability to omit ORDER BY clause from .near scope (pass option :order => false).
+* Fix: error on Yahoo lookup due to API change (thanks github.com/kynesun).
+* Fix: problem with Mongoid field aliases not being respected.
+* Fix: :exclude option to .near scope when primary key != :id (thanks github.com/smisml).
+* Much code refactoring (added Geocoder::Query class and Geocoder::Sql module).
+
+== 1.1.3 (2012 Aug 26)
+
+* Add support for Mapquest geocoding service (thanks github.com/razorinc).
+* Add :test lookup for easy testing of apps using Geocoder (thanks github.com/mguterl).
+* Add #precision method to Yandex results (thanks github.com/gemaker).
+* Add support for raising :all exceptions (thanks github.com/andyvb).
+* Add exceptions for certain Google geocoder responses (thanks github.com/andyvb).
+* Add Travis-CI integration (thanks github.com/petergoldstein).
+* Fix: unit config was not working with SQLite (thanks github.com/balvig).
+* Fix: get tests to pass under Jruby (thanks github.com/petergoldstein).
+* Fix: bug in distance_from_sql method (error occurred when coordinates not found).
+* Fix: incompatibility with Mongoid 3.0.x (thanks github.com/petergoldstein).
+
+== 1.1.2 (2012 May 24)
+
+* Add ability to specify default units and distance calculation method (thanks github.com/abravalheri).
+* Add new (optional) configuration syntax (thanks github.com/abravalheri).
+* Add support for cache stores that provide :get and :set methods.
+* Add support for custom HTTP request headers (thanks github.com/robotmay).
+* Add Result#cache_hit attribute (thanks github.com/s01ipsist).
+* Fix: rake geocode:all wasn't properly loading namespaced classes.
+* Fix: properly recognize IP addresses with ::ffff: prefix (thanks github.com/brian-ewell).
+* Fix: avoid exception during calculations when coordinates not known (thanks github.com/flori).
+
+== 1.1.1 (2012 Feb 16)
+
+* Add distance_from_sql class method to geocoded class (thanks github.com/dwilkie).
+* Add OverQueryLimitError and raise when relevant for Google lookup.
+* Fix: don't cache API data if response indicates an error.
+* Fix: within_bounding_box now uses correct lat/lon DB columns (thanks github.com/kongo).
+* Fix: error accessing city in some cases with Yandex result (thanks github.com/kor6n and sld).
+
+== 1.1.0 (2011 Dec 3)
+
+* A block passed to geocoded_by is now always executed, even if the geocoding service returns no results. This means you need to make sure you have results before trying to assign data to your object.
+* Fix issues with joins and row counts (issues #49, 86, and 108) by not using GROUP BY clause with ActiveRecord scopes.
+* Fix incorrect object ID when join used (fixes issue #140).
+* Fix calculation of bounding box which spans 180th meridian (thanks github.com/hwuethrich).
+* Add within_bounding_box scope for ActiveRecord-based models (thanks github.com/gavinhughes and dbloete).
+* Add option to raise Geocoder::OverQueryLimitError for Google geocoding service.
+* Add support for Nominatim geocoding service (thanks github.com/wranglerdriver).
+* Add support for API key to Geocoder.ca geocoding service (thanks github.com/ryanLonac).
+* Add support for state to Yandex results (thanks github.com/tipugin).
+
+== 1.0.5 (2011 Oct 26)
+
+* Fix error with `rake assets:precompile` (thanks github.com/Sush).
+* Fix HTTPS support (thanks github.com/rsanheim).
+* Improve cache interface.
+
+== 1.0.4 (2011 Sep 18)
+
+* Remove klass method from rake task, which could conflict with app methods (thanks github.com/mguterl).
+
+== 1.0.3 (2011 Sep 17)
+
+* Add support for Google Premier geocoding service (thanks github.com/steveh).
+* Update Google API URL (thanks github.com/soorajb).
+* Allow rescue from timeout with FreeGeoIP (thanks github.com/lukeledet).
+* Fix: rake assets:precompile (Rails 3.1) not working in some situations.
+* Fix: stop double-adjusting units when using kilometers (thanks github.com/hairyheron).
+
+== 1.0.2 (2011 June 25)
+
+* Add support for MongoMapper (thanks github.com/spagalloco).
+* Fix: user-specified coordinates field wasn't working with Mongoid (thanks github.com/thisduck).
+* Fix: invalid location given to near scope was returning all results (Active Record) or error (Mongoid) (thanks github.com/ogennadi).
+
 == 1.0.1 (2011 May 17)
 
 * Add option to not rescue from certain exceptions (thanks github.com/ahmedrb).

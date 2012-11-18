@@ -4,6 +4,12 @@ require 'test/unit'
 $LOAD_PATH.unshift(File.dirname(__FILE__))
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
 
+class MysqlConnection
+  def adapter_name
+    "mysql"
+  end
+end
+
 ##
 # Simulate enough of ActiveRecord::Base that objects can be used for testing.
 #
@@ -28,6 +34,10 @@ module ActiveRecord
 
     def self.scope(*args); end
 
+    def self.connection
+      MysqlConnection.new
+    end
+
     def method_missing(name, *args, &block)
       if name.to_s[-1..-1] == "="
         write_attribute name.to_s[0...-1], *args
@@ -35,6 +45,17 @@ module ActiveRecord
         read_attribute name
       end
     end
+
+    class << self
+      def table_name
+        'test_table_name'
+      end
+
+      def primary_key
+        :id
+      end
+    end
+
   end
 end
 
@@ -54,16 +75,22 @@ module Geocoder
     class Base
       private #-----------------------------------------------------------------
       def read_fixture(file)
-        File.read(File.join("test", "fixtures", file)).strip.gsub(/\n\s*/, "")
+        filepath = File.join("test", "fixtures", file)
+        s = File.read(filepath).strip.gsub(/\n\s*/, "")
+        s.instance_eval do
+          def body; self; end
+          def code; "200"; end
+        end
+        s
       end
     end
 
     class Google < Base
       private #-----------------------------------------------------------------
-      def fetch_raw_data(query, reverse = false)
-        raise TimeoutError if query == "timeout"
-        raise SocketError if query == "socket_error"
-        file = case query
+      def make_api_request(query)
+        raise TimeoutError if query.text == "timeout"
+        raise SocketError if query.text == "socket_error"
+        file = case query.text
           when "no results";   :no_results
           when "no locality";  :no_locality
           when "no city data"; :no_city_data
@@ -73,14 +100,18 @@ module Geocoder
       end
     end
 
+    class GooglePremier < Google
+    end
+
     class Yahoo < Base
       private #-----------------------------------------------------------------
-      def fetch_raw_data(query, reverse = false)
-        raise TimeoutError if query == "timeout"
-        raise SocketError if query == "socket_error"
-        file = case query
-          when "no results";  :no_results
-          else                :madison_square_garden
+      def make_api_request(query)
+        raise TimeoutError if query.text == "timeout"
+        raise SocketError if query.text == "socket_error"
+        file = case query.text
+          when "no results"; :no_results
+          when "error";      :error
+          else               :madison_square_garden
         end
         read_fixture "yahoo_#{file}.json"
       end
@@ -88,10 +119,10 @@ module Geocoder
 
     class Yandex < Base
       private #-----------------------------------------------------------------
-      def fetch_raw_data(query, reverse = false)
-        raise TimeoutError if query == "timeout"
-        raise SocketError if query == "socket_error"
-        file = case query
+      def make_api_request(query)
+        raise TimeoutError if query.text == "timeout"
+        raise SocketError if query.text == "socket_error"
+        file = case query.text
           when "no results";  :no_results
           when "invalid key"; :invalid_key
           else                :kremlin
@@ -102,13 +133,13 @@ module Geocoder
 
     class GeocoderCa < Base
       private #-----------------------------------------------------------------
-      def fetch_raw_data(query, reverse = false)
-        raise TimeoutError if query == "timeout"
-        raise SocketError if query == "socket_error"
-        if reverse
+      def make_api_request(query)
+        raise TimeoutError if query.text == "timeout"
+        raise SocketError if query.text == "socket_error"
+        if query.reverse_geocode?
           read_fixture "geocoder_ca_reverse.json"
         else
-          file = case query
+          file = case query.text
             when "no results";  :no_results
             else                :madison_square_garden
           end
@@ -119,27 +150,57 @@ module Geocoder
 
     class Freegeoip < Base
       private #-----------------------------------------------------------------
-      def fetch_raw_data(query, reverse = false)
-        raise TimeoutError if query == "timeout"
-        raise SocketError if query == "socket_error"
-        read_fixture "freegeoip_74_200_247_59.json"
+      def make_api_request(query)
+        raise TimeoutError if query.text == "timeout"
+        raise SocketError if query.text == "socket_error"
+        file = case query.text
+          when "no results";  :no_results
+          else                "74_200_247_59"
+        end
+        read_fixture "freegeoip_#{file}.json"
       end
     end
 
     class Bing < Base
       private #-----------------------------------------------------------------
-      def fetch_raw_data(query, reverse = false)
-        raise TimeoutError if query == "timeout"
-        raise SocketError if query == "socket_error"
-        if reverse
+      def make_api_request(query)
+        raise TimeoutError if query.text == "timeout"
+        raise SocketError if query.text == "socket_error"
+        if query.reverse_geocode?
           read_fixture "bing_reverse.json"
         else
-          file = case query
+          file = case query.text
             when "no results";  :no_results
             else                :madison_square_garden
           end
           read_fixture "bing_#{file}.json"
         end
+      end
+    end
+
+    class Nominatim < Base
+      private #-----------------------------------------------------------------
+      def make_api_request(query)
+        raise TimeoutError if query.text == "timeout"
+        raise SocketError if query.text == "socket_error"
+        file = case query.text
+          when "no results";  :no_results
+          else                :madison_square_garden
+        end
+        read_fixture "nominatim_#{file}.json"
+      end
+    end
+
+    class Mapquest < Base
+      private #-----------------------------------------------------------------
+      def make_api_request(query)
+        raise TimeoutError if query.text == "timeout"
+        raise SocketError if query.text == "socket_error"
+        file = case query.text
+          when "no results";  :no_results
+          else                :madison_square_garden
+        end
+        read_fixture "mapquest_#{file}.json"
       end
     end
 
@@ -157,6 +218,20 @@ class Venue < ActiveRecord::Base
     write_attribute :name, name
     write_attribute :address, address
   end
+end
+
+##
+# Geocoded model.
+# - Has user-defined primary key (not just 'id')
+#
+class VenuePlus < Venue
+
+  class << self
+    def primary_key
+      :custom_primary_key_id
+    end
+  end
+
 end
 
 ##
@@ -180,6 +255,8 @@ class Event < ActiveRecord::Base
   geocoded_by :address do |obj,results|
     if result = results.first
       obj.coords_string = "#{result.latitude},#{result.longitude}"
+    else
+      obj.coords_string = "NOT FOUND"
     end
   end
 
@@ -224,6 +301,12 @@ end
 
 
 class Test::Unit::TestCase
+
+  def teardown
+    Geocoder.send(:remove_const, :Configuration)
+    load "geocoder/configuration.rb"
+  end
+
   def venue_params(abbrev)
     {
       :msg => ["Madison Square Garden", "4 Penn Plaza, New York, NY"]
@@ -236,11 +319,26 @@ class Test::Unit::TestCase
     }[abbrev]
   end
 
-  def all_lookups
-    Geocoder.valid_lookups
+  def is_nan_coordinates?(coordinates)
+    return false unless coordinates.respond_to? :size # Should be an array
+    return false unless coordinates.size == 2 # Should have dimension 2
+    coordinates[0].nan? && coordinates[1].nan? # Both coordinates should be NaN
   end
 
-  def street_lookups
-    all_lookups - [:freegeoip]
+  def set_api_key!(lookup_name)
+    if lookup_name == :google_premier
+      Geocoder::Configuration.api_key = [
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        'cccccccccccccccccccccccccccccc'
+      ]
+    elsif lookup_name == :yahoo
+      Geocoder::Configuration.api_key = [
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+      ]
+    else
+      Geocoder::Configuration.api_key = nil
+    end
   end
 end

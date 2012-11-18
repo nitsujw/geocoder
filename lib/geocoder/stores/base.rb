@@ -20,9 +20,10 @@ module Geocoder
       # Calculate the distance from the object to an arbitrary point.
       # See Geocoder::Calculations.distance_between for ways of specifying
       # the point. Also takes a symbol specifying the units
-      # (:mi or :km; default is :mi).
+      # (:mi or :km; can be specified in Geocoder configuration).
       #
-      def distance_to(point, units = :mi)
+      def distance_to(point, units = nil)
+        units ||= self.class.geocoder_options[:units]
         return nil unless geocoded?
         Geocoder::Calculations.distance_between(
           to_coordinates, point, :units => units)
@@ -36,6 +37,7 @@ module Geocoder
       # ways of specifying the point.
       #
       def bearing_to(point, options = {})
+        options[:method] ||= self.class.geocoder_options[:method]
         return nil unless geocoded?
         Geocoder::Calculations.bearing_between(
           to_coordinates, point, options)
@@ -47,6 +49,7 @@ module Geocoder
       # ways of specifying the point.
       #
       def bearing_from(point, options = {})
+        options[:method] ||= self.class.geocoder_options[:method]
         return nil unless geocoded?
         Geocoder::Calculations.bearing_between(
           point, to_coordinates, options)
@@ -78,7 +81,6 @@ module Geocoder
         fail
       end
 
-
       private # --------------------------------------------------------------
 
       ##
@@ -98,20 +100,20 @@ module Geocoder
           return
         end
 
-        if (results = Geocoder.search(query)).size > 0
+        results = Geocoder.search(query)
 
-          # execute custom block, if specified in configuration
-          block_key = reverse ? :reverse_block : :geocode_block
-          if custom_block = options[block_key]
-            custom_block.call(self, results)
+        # execute custom block, if specified in configuration
+        block_key = reverse ? :reverse_block : :geocode_block
+        if custom_block = options[block_key]
+          custom_block.call(self, results)
 
-          # else execute block passed directly to this method,
-          # which generally performs the "auto-assigns"
-          elsif block_given?
-            yield(self, results)
-          end
+        # else execute block passed directly to this method,
+        # which generally performs the "auto-assigns"
+        elsif block_given?
+          yield(self, results)
         end
       end
     end
   end
 end
+

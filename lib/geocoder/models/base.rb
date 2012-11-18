@@ -12,7 +12,9 @@ module Geocoder
         if defined?(@geocoder_options)
           @geocoder_options
         elsif superclass.respond_to?(:geocoder_options)
-          superclass.geocoder_options
+          superclass.geocoder_options || { }
+        else
+          { }
         end
       end
 
@@ -24,17 +26,17 @@ module Geocoder
         fail
       end
 
-
       private # ----------------------------------------------------------------
 
       def geocoder_init(options)
         unless @geocoder_options
           @geocoder_options = {}
           require "geocoder/stores/#{geocoder_file_name}"
-          include eval("Geocoder::Store::" + geocoder_module_name)
+          include Geocoder::Store.const_get(geocoder_module_name)
         end
         @geocoder_options.merge! options
       end
     end
   end
 end
+
